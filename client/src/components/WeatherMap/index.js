@@ -14,6 +14,7 @@ import {
   NORMAL_RADAR_REFRESH_MS,
   SEVERE_RADAR_REFRESH_MS,
 } from "~/severeWeather";
+import { startRefreshLoop } from "~/services/refresh";
 import styles from "./styles.css";
 
 /**
@@ -66,27 +67,21 @@ const WeatherMap = ({ zoom, dark }) => {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Radar frame list: every 10 minutes normally (RainViewer publishes a new
-  // frame every 10 min), every 5 minutes in severe weather mode.
-  useEffect(() => {
-    const updateTimeStamps = () => {
-      getMapTimestamps()
-        .then((res) => {
-          setMapTimestamps(res);
-        })
-        .catch((err) => {
-          console.log("err", err);
-        });
-    };
-
-    const mapTimestampsInterval = setInterval(
-      updateTimeStamps,
-      severeMode ? SEVERE_RADAR_REFRESH_MS : NORMAL_RADAR_REFRESH_MS
-    );
-    updateTimeStamps(); //initial update
-    return () => {
-      clearInterval(mapTimestampsInterval);
-    };
-  }, [severeMode]);
+  // frame every 10 min), every 5 minutes in severe weather mode. A failed
+  // refresh is retried after 1, 2, 4... minutes (see startRefreshLoop).
+  useEffect(
+    () =>
+      startRefreshLoop({
+        run: () =>
+          getMapTimestamps().then((res) => {
+            setMapTimestamps(res);
+          }),
+        intervalMs: severeMode
+          ? SEVERE_RADAR_REFRESH_MS
+          : NORMAL_RADAR_REFRESH_MS,
+      }),
+    [severeMode]
+  );
 
   // Pan the screen to a a specific location when `panToCoords` is updated with grid coordinates
   useEffect(() => {

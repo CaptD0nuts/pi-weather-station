@@ -27,8 +27,9 @@ export const SEVERE_EVENT_PATTERNS = [
 export const SEVERE_ALERT_POLL_MS = 5 * 60 * 1000; // check for alerts every 5 min
 export const NORMAL_RADAR_REFRESH_MS = 10 * 60 * 1000;
 export const SEVERE_RADAR_REFRESH_MS = 5 * 60 * 1000;
-export const NORMAL_CURRENT_WEATHER_REFRESH_MS = 10 * 60 * 1000;
-export const SEVERE_CURRENT_WEATHER_REFRESH_MS = 5 * 60 * 1000;
+// Current conditions, hourly chart and daily chart all refresh together (one call)
+export const NORMAL_WEATHER_REFRESH_MS = 10 * 60 * 1000;
+export const SEVERE_WEATHER_REFRESH_MS = 5 * 60 * 1000;
 
 /**
  * Is this NWS event name one that should trigger severe weather mode?

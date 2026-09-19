@@ -3,6 +3,7 @@ import { getSettings } from "~/settings";
 import PropTypes from "prop-types";
 import { getCoordsFromApi } from "~/services/geolocation";
 import { getSevereAlerts, SEVERE_ALERT_POLL_MS } from "~/severeWeather";
+import { getSunTimes } from "~/services/sunTimes";
 import axios from "axios";
 
 export const AppContext = createContext();
@@ -12,6 +13,11 @@ const SPEED_UNIT_STORAGE_KEY = "speedUnit";
 const LENGTH_UNIT_STORAGE_KEY = "lengthUnit";
 const CLOCK_UNIT_STORAGE_KEY = "clockTime";
 const MOUSE_HIDE_STORAGE_KEY = "mouseHide";
+
+// One weather request covers all three: 4 days of daily data, and the hourly
+// chart shows the first 24 hours of it.
+const FORECAST_LENGTH_MS = 4 * 24 * 60 * 60 * 1000;
+const HOURLY_CHART_POINTS = 24;
 
 /**
  * App context provider
@@ -65,7 +71,13 @@ export function AppContextProvider({ children }) {
     }
     const check = () => {
       getSevereAlerts(homeLat, homeLon)
-        .then((alerts) => setSevereAlerts(alerts))
+        // Keep the existing list when nothing changed: a fresh (even empty)
+        // array counts as new state and re-rendered the whole app every poll.
+        .then((alerts) =>
+          setSevereAlerts((prev) =>
+            JSON.stringify(prev) === JSON.stringify(alerts) ? prev : alerts
+          )
+        )
         .catch((err) => console.log("severe alert check failed", err));
     };
     check();
@@ -205,9 +217,9 @@ export function AppContextProvider({ children }) {
    * @param {String} coords.longitude
    */
   function setMapPosition(coords) {
-    updateCurrentWeatherData(coords);
-    updateHourlyWeatherData(coords);
-    updateDailyWeatherData(coords);
+    // No weather fetches here: changing `mapGeo` already makes WeatherInfo
+    // re-create its update intervals, and each of those fetches immediately.
+    // Fetching here as well doubled the API calls per tap (6 instead of 3).
     setMapGeo(coords);
     setPanToCoords(coords);
   }
@@ -327,119 +339,103 @@ export function AppContextProvider({ children }) {
   }
 
   /**
-   * Updates hourly weather data
+   * Updates current, hourly and daily weather data with ONE API request.
+   * Tomorrow.io returns one timeline per requested timestep, so a single call
+   * with `timesteps=current,1h,1d` replaces the three separate calls this used
+   * to make (a third of the rate-limit use per refresh, tap or page load). The
+   * result is split back into the same three pieces of state, in the same
+   * shape the components already read.
    *
    * @param {Object} coords
    * @param {Number} coords.latitude latitude
    * @param {Number} coords.longitude longitude
    *
-   * @returns {Promise} hourly weather data
+   * @returns {Promise} raw API response data
    */
-  function updateHourlyWeatherData(coords) {
+  function updateWeatherData(coords) {
+    setCurrentWeatherDataErr(null);
+    setCurrentWeatherDataErrMsg(null);
     setHourlyWeatherDataErr(null);
     setHourlyWeatherDataErrMsg(null);
-    const { latitude, longitude } = coords;
-    const fields = [
-      "temperature",
-      "precipitationProbability",
-      "precipitationIntensity",
-      "windSpeed",
-    ].join("%2c");
+    setDailyWeatherDataErr(null);
+    setDailyWeatherDataErrMsg(null);
 
-    const endTime = new Date(
-      new Date().getTime() + 60 * 60 * 23 * 1000
-    ).toISOString();
+    const fail = (message) => {
+      setCurrentWeatherDataErr(true);
+      setHourlyWeatherDataErr(true);
+      setDailyWeatherDataErr(true);
+      if (message) {
+        setCurrentWeatherDataErrMsg(message);
+        setHourlyWeatherDataErrMsg(message);
+        setDailyWeatherDataErrMsg(message);
+      }
+    };
 
     return new Promise((resolve, reject) => {
       if (!coords) {
-        setHourlyWeatherDataErr(true);
+        fail();
         return reject("No coords");
       }
       if (!weatherApiKey) {
-        setHourlyWeatherDataErr(true);
+        fail();
         setSettingsMenuOpen(true);
         return reject("Missing weather API key");
       }
+      const { latitude, longitude } = coords;
+      const fields = [
+        "temperature",
+        "humidity",
+        "windSpeed",
+        "precipitationIntensity",
+        "precipitationType",
+        "precipitationProbability",
+        "cloudCover",
+        "weatherCode",
+      ].join("%2c");
+      const endTime = new Date(new Date().getTime() + FORECAST_LENGTH_MS).toISOString();
 
       axios
         .get(
-          `https://api.tomorrow.io/v4/timelines?location=${latitude}%2C${longitude}&fields=${fields}&timesteps=1h&apikey=${weatherApiKey}&endTime=${endTime}`
+          `https://api.tomorrow.io/v4/timelines?location=${latitude}%2C${longitude}&fields=${fields}&timesteps=current%2c1h%2c1d&apikey=${weatherApiKey}&endTime=${endTime}`
         )
         .then((res) => {
-          if (!res) {
-            return reject({ message: "No response" });
+          const timelines = res?.data?.data?.timelines || [];
+          const current = timelines.find((t) => t.timestep === "current");
+          const hourly = timelines.find((t) => t.timestep === "1h");
+          const daily = timelines.find((t) => t.timestep === "1d");
+          if (!current || !hourly || !daily) {
+            fail("Incomplete weather response");
+            return reject({ message: "Incomplete weather response" });
           }
-          const { data } = res;
-          setHourlyWeatherData(data);
-          resolve(data);
+          setCurrentWeatherData({ data: { timelines: [current] } });
+          setHourlyWeatherData({
+            data: {
+              timelines: [
+                { ...hourly, intervals: hourly.intervals.slice(0, HOURLY_CHART_POINTS) },
+              ],
+            },
+          });
+          setDailyWeatherData({ data: { timelines: [daily] } });
+          resolve(res.data);
         })
         .catch((err) => {
-          setHourlyWeatherDataErr(true);
-          if (err && err.message) {
-            setHourlyWeatherDataErrMsg(err.message);
-          }
-
+          fail(err && err.message);
           reject(err);
         });
     });
   }
 
   /**
-   * Updates daily  weather data
+   * Sets today's sunrise and sunset for a location. Calculated on this
+   * computer (see services/sunTimes.js) instead of asking a website, so it can
+   * never fail or go stale. Rounded to the nearest minute, as almanacs do.
    *
    * @param {Object} coords
    * @param {Number} coords.latitude latitude
    * @param {Number} coords.longitude longitude
    *
-   * @returns {Promise} daily weather data
+   * @returns {Promise} `{ sunrise, sunset }` Dates (null if the sun doesn't rise/set today)
    */
-  function updateDailyWeatherData(coords) {
-    setDailyWeatherDataErr(null);
-    setDailyWeatherDataErrMsg(null);
-    const { latitude, longitude } = coords;
-    const fields = [
-      "temperature",
-      "precipitationProbability",
-      "precipitationIntensity",
-      "windSpeed",
-    ].join("%2c");
-
-    const endTime = new Date(
-      new Date().getTime() + 4 * 60 * 60 * 24 * 1000
-    ).toISOString();
-
-    return new Promise((resolve, reject) => {
-      if (!coords) {
-        setDailyWeatherDataErr(true);
-        return reject("No coords");
-      }
-      if (!weatherApiKey) {
-        setDailyWeatherDataErr(true);
-        setSettingsMenuOpen(true);
-        return reject("Missing weather API key");
-      }
-      axios
-        .get(
-          `https://api.tomorrow.io/v4/timelines?location=${latitude}%2C${longitude}&fields=${fields}&timesteps=1d&apikey=${weatherApiKey}&endTime=${endTime}`
-        )
-        .then((res) => {
-          if (!res) {
-            return reject({ message: "No response" });
-          }
-          const { data } = res;
-          setDailyWeatherData(data);
-          resolve(data);
-        })
-        .catch((err) => {
-          setDailyWeatherDataErr(true);
-          if (err && err.message) {
-            setDailyWeatherDataErrMsg(err.message);
-          }
-          reject(err);
-        });
-    });
-  }
-
   function updateSunriseSunset(coords) {
     return new Promise((resolve, reject) => {
       if (!coords) {
@@ -447,86 +443,20 @@ export function AppContextProvider({ children }) {
         setSunsetTime(null);
         return reject("No coords");
       }
-      const { latitude, longitude } = coords;
-
-      axios
-        .get(
-          `https://api.sunrise-sunset.org/json?lat=${latitude}&lng=${longitude}&formatted=0`
-        )
-        .then((res) => {
-          const { results } = res?.data;
-          if (results) {
-            const { sunrise, sunset } = results;
-            setSunriseTime(sunrise);
-            setSunsetTime(sunset);
-          } else {
-            setSunriseTime(null);
-            setSunsetTime(null);
-          }
-          resolve(results);
-        })
-        .catch((err) => {
-          setSunriseTime(null);
-          setSunsetTime(null);
-          reject(err);
-        });
-    });
-  }
-
-  /**
-   * Updates current weather data
-   *
-   * @param {Object} coords
-   * @param {Number} coords.latitude latitude
-   * @param {Number} coords.longitude longitude
-   *
-   * @returns {Promise} current weather data
-   */
-  function updateCurrentWeatherData(coords) {
-    setCurrentWeatherDataErr(null);
-    setCurrentWeatherDataErrMsg(null);
-    const { latitude, longitude } = coords;
-
-    const fields = [
-      "temperature",
-      "humidity",
-      "windSpeed",
-      "precipitationIntensity",
-      "precipitationType",
-      "precipitationProbability",
-      "cloudCover",
-      "weatherCode",
-    ].join("%2c");
-    return new Promise((resolve, reject) => {
-      if (!coords) {
-        setCurrentWeatherDataErr(true);
-        return reject("No coords");
+      const { sunrise, sunset } = getSunTimes(
+        new Date(),
+        Number(coords.latitude),
+        Number(coords.longitude)
+      );
+      if (sunrise && sunset) {
+        const toMinute = (d) => new Date(Math.round(d.getTime() / 60000) * 60000);
+        setSunriseTime(toMinute(sunrise).toISOString());
+        setSunsetTime(toMinute(sunset).toISOString());
+      } else {
+        setSunriseTime(null);
+        setSunsetTime(null);
       }
-      if (!weatherApiKey) {
-        setCurrentWeatherDataErr(true);
-        setSettingsMenuOpen(true);
-        return reject("Missing weather API key");
-      }
-
-      axios
-        .get(
-          `https://api.tomorrow.io/v4/timelines?location=${latitude}%2C${longitude}&fields=${fields}&timesteps=current&apikey=${weatherApiKey}`
-        )
-        .then((res) => {
-          if (!res) {
-            return reject({ message: "No response" });
-          }
-          const { data } = res;
-          setCurrentWeatherData(data);
-          resolve(data);
-        })
-        .catch((err) => {
-          setCurrentWeatherDataErr(true);
-          if (err && err.message) {
-            setCurrentWeatherDataErrMsg(err.message);
-          }
-          reject(err);
-        });
+      resolve({ sunrise, sunset });
     });
   }
 
@@ -623,9 +553,7 @@ export function AppContextProvider({ children }) {
     clockTime,
     saveClockTime,
     saveSettingsToJson,
-    updateCurrentWeatherData,
-    updateDailyWeatherData,
-    updateHourlyWeatherData,
+    updateWeatherData,
     currentWeatherData,
     currentWeatherDataErr,
     currentWeatherDataErrMsg,
