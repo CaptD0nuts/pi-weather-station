@@ -1,6 +1,6 @@
 // Compares client/src/services/sunTimes.js with the US Naval Observatory's sunrise/sunset service (the official
 // reference; it publishes whole minutes). Needs the network.
-const { getSunTimes } = await (await import("./load-sun-times.js")).default.loadSunTimes();
+const { getSunTimes } = await (await import("./load-modules.js")).default.loadSunTimes();
 const cases = [["Nashville TN", 36.1627, -86.7816, "2026-09-18", -5], ["Nashville TN", 36.1627, -86.7816, "2026-12-21", -6], ["Nashville TN", 36.1627, -86.7816, "2026-06-21", -5], ["Anchorage", 61.2181, -149.9003, "2026-06-21", -8]];
 const fmt = (d, off) => { const t = new Date(d.getTime() + off * 3600000); return t.toISOString().slice(11, 19); };
 for (const [name, lat, lon, ds, tz] of cases) {

@@ -5,7 +5,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath, pathToFileURL } from "url";
 
-const { getSunTimes } = await (await import("./load-sun-times.js")).default.loadSunTimes();
+const { getSunTimes } = await (await import("./load-modules.js")).default.loadSunTimes();
 
 const places = [
   ["Nashville TN", 36.1627, -86.7816],

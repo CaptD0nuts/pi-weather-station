@@ -145,10 +145,10 @@ function tomorrowResponse(url) {
   const resetLog = log.slice();
 
   const panelText = await page.evaluate(() => document.body.innerText);
-  const { getSunTimes } = await require("./load-sun-times.js").loadSunTimes();
+  const { getSunTimes } = await require("./load-modules.js").loadSunTimes();
   const st = getSunTimes(new Date(), 36.1627, -86.7816);
   const fmtT = (d) => new Date(Math.round(d.getTime() / 60000) * 60000).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  const norm = (x) => x.replace(/[s  ]+/g, "");
+  const norm = (x) => x.replace(/[\s\u202f\u00a0]+/g, "");
   const expectSun = fmtT(st.sunrise) + " / " + fmtT(st.sunset);
   const shows = {
     sunTimesOnScreen: norm(startupText).includes(norm(fmtT(st.sunrise))) && norm(startupText).includes(norm(fmtT(st.sunset))),
