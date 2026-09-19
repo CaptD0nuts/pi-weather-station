@@ -151,6 +151,10 @@ const WeatherMap = ({ zoom, dark }) => {
           dark ? "dark-v10" : "light-v10"
         }/tiles/{z}/{x}/{y}?access_token={apiKey}`}
         apiKey={mapApiKey}
+        // Mapbox serves 512 px tiles at this URL. Drawing them at 256 px (the default) made the
+        // map labels half size and blurry; upstream fix (thicla01, elewin/pi-weather-station #76).
+        tileSize={512}
+        zoomOffset={-1}
       />
       {mapTimestamp ? (
         <TileLayer

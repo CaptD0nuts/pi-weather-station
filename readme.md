@@ -7,12 +7,13 @@ This is a weather station designed to be used with a Raspberry Pi on the officia
 >
 > A fork of [elewin/pi-weather-station](https://github.com/elewin/pi-weather-station) (MIT licensed, see `LICENSE`)
 > tuned to run as an always-on display on a Raspberry Pi 4 with a 1024x600 touchscreen, coming back by itself after a
-> power cut. It is based on upstream commit `05ed3f0`; upstream has since made its own fixes (a Tomorrow.io v4 update,
-> a RainViewer fix, webpack 5) that have **not** been merged here. What is different:
+> power cut. It is kept in step with upstream: last merged `ea4c09c` (v3.0.2), which brought webpack 5, upstream's own
+> Tomorrow.io v4 and RainViewer fixes, and the map label-size fix. What is different:
 >
-> - **Works again.** The old ClimaCell address (`data.climacell.co`) and RainViewer's retired radar endpoints no longer
->   answer, so no weather or radar loaded. Uses `api.tomorrow.io` and RainViewer's current `weather-maps.json` (radar
->   is real only up to zoom 7, so the layer stretches zoom-7 tiles).
+> - **API fixes (made before upstream's own).** The old ClimaCell address (`data.climacell.co`) and RainViewer's retired
+>   radar endpoints stopped answering, so no weather or radar loaded. This fork uses `api.tomorrow.io` and RainViewer's
+>   `weather-maps.json` (radar is real only up to zoom 7, so the layer stretches zoom-7 tiles). Where upstream later
+>   fixed the same things differently, this fork's version was kept.
 > - **Severe weather mode.** Polls the free National Weather Service alerts feed; while a Tornado, Severe Thunderstorm,
 >   Flash Flood, Hurricane... Watch or Warning is active, or a Special Weather Statement about a storm hazard (the
 >   notice the NWS issues for a strong storm before it becomes a warning), it shows a red banner, animates the radar by
@@ -41,9 +42,13 @@ See it in action [here](https://www.youtube.com/watch?v=dvM6cyqYSw8).
 
 > Be mindful of the plan limits for your API keys and understand the terms of each provider, as scrolling around the map and selecting different locations will incur API calls for every location. Additionally, the weather station will periodically make additional api calls to get weather updates throughout the day.
 
+# v3.0.2
+
+05-04-2026: Updated to use latest [Tomorrow.io](https://www.tomorrow.io/) API, other bug fixes
+
 # v2.0.0
 
-1-22-2021: Now uses [ClimaCell](https://www.climacell.co/) API v4. For ClimaCell API v3 keys, use [Pi Weather Station v1](https://github.com/elewin/pi-weather-station/releases/tag/v1.0).
+1-22-2021: Now uses the [Tomorrow.io](https://www.tomorrow.io/) (formerly ClimaCell) API v4. For ClimaCell API v3 keys, use [Pi Weather Station v1](https://github.com/elewin/pi-weather-station/releases/tag/v1.0).
 
 # Setup
 
@@ -84,6 +89,10 @@ The server will now serve the app across your network.
 # Do you want to Host this Application in Docker?
 
 Pi Weather Station is available as a Docker Image for AMD64 and ARM infrastructures. see the *ReadME* here for more: https://github.com/SeanRiggs/pi-weather-station/blob/master/Docker%20Image/Docker-ReadMe.md
+
+# Thanks
+
+Thanks to thicla01 for the label size bug fix, and dagent23 for tile layer fixes
 
 # License
 
