@@ -1,0 +1,16 @@
+{
+  "name": "pi-weather-station-tests",
+  "private": true,
+  "description": "Headless-browser tests for the weather display. Every outside service is faked, so they use none of your API quota.",
+  "scripts": {
+    "api-calls": "node api-calls.js",
+    "alerts": "node alerts.js",
+    "clock": "node clock.js",
+    "severe-match": "node severe-match.js",
+    "sun-check": "node sun-check.mjs",
+    "usno-check": "node usno-check.mjs"
+  },
+  "dependencies": {
+    "puppeteer-core": "^25.11.0"
+  }
+}
