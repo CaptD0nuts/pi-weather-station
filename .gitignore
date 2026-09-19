@@ -5,4 +5,12 @@ settings.json
 .env
 *.bak
 *.bak.*
-settings.json.bak*
+
+# Any copy of settings.json (it holds the API keys), whatever makes it: backups, or the
+# settings.json.save / settings.json.save.1 files that the nano editor writes when a save
+# is interrupted. (settings.example.json, the placeholder file, is not matched.)
+settings.json.*
+*.save
+*.save.*
+*.swp
+*~
