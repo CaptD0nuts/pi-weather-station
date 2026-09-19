@@ -10,6 +10,10 @@ import PropTypes from "prop-types";
 import { AppContext } from "~/AppContext";
 import debounce from "debounce";
 import axios from "axios";
+import {
+  NORMAL_RADAR_REFRESH_MS,
+  SEVERE_RADAR_REFRESH_MS,
+} from "~/severeWeather";
 import styles from "./styles.css";
 
 /**
@@ -32,6 +36,7 @@ const WeatherMap = ({ zoom, dark }) => {
     getMapApiKey,
     markerIsVisible,
     animateWeatherMap,
+    severeMode,
   } = useContext(AppContext);
   const mapRef = useRef();
 
@@ -48,7 +53,6 @@ const WeatherMap = ({ zoom, dark }) => {
   const [mapTimestamp, setMapTimestamp] = useState(null);
   const [currentMapTimestampIdx, setCurrentMapTimestampIdx] = useState(0);
 
-  const MAP_TIMESTAMP_REFRESH_FREQUENCY = 1000 * 60 * 10; //update every 10 minutes
   const MAP_CYCLE_RATE = 1000; //ms
 
   const getMapApiKeyCallback = useCallback(() => getMapApiKey(), [
@@ -59,7 +63,11 @@ const WeatherMap = ({ zoom, dark }) => {
     getMapApiKeyCallback().catch((err) => {
       console.log("err!", err);
     });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Radar frame list: every 10 minutes normally (RainViewer publishes a new
+  // frame every 10 min), every 5 minutes in severe weather mode.
+  useEffect(() => {
     const updateTimeStamps = () => {
       getMapTimestamps()
         .then((res) => {
@@ -72,13 +80,13 @@ const WeatherMap = ({ zoom, dark }) => {
 
     const mapTimestampsInterval = setInterval(
       updateTimeStamps,
-      MAP_TIMESTAMP_REFRESH_FREQUENCY
+      severeMode ? SEVERE_RADAR_REFRESH_MS : NORMAL_RADAR_REFRESH_MS
     );
     updateTimeStamps(); //initial update
     return () => {
       clearInterval(mapTimestampsInterval);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [severeMode]);
 
   // Pan the screen to a a specific location when `panToCoords` is updated with grid coordinates
   useEffect(() => {
@@ -153,7 +161,7 @@ const WeatherMap = ({ zoom, dark }) => {
         <TileLayer
           attribution='<a href="https://www.rainviewer.com/">RainViewer</a>'
           url={`${mapTimestamp}/{size}/{z}/{x}/{y}/{color}/{smooth}_{snow}.png`}
-          opacity={0.3}
+          opacity={severeMode ? 0.6 : 0.3}
           maxNativeZoom={7} // RainViewer serves "Zoom Level Not Supported" tiles above zoom 7
           size={512}
           color={6} // https://www.rainviewer.com/api.html#colorSchemes

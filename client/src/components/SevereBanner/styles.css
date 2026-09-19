@@ -1,0 +1,37 @@
+.banner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 300px; /* leave the info panel uncovered */
+  z-index: 2000;
+  padding: 6px 10px;
+  text-align: center;
+  font-size: 22px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #fff;
+  background-color: rgba(200, 0, 0, 0.92);
+  pointer-events: none;
+  /*
+   * A blink, not a smooth fade: steps(1) holds each colour for a second and then
+   * switches, so the banner repaints once a second. A smooth background-color
+   * fade repainted it on every frame (~60x a second) and used about 10% of the
+   * Pi's CPU for as long as an alert lasted (measured). Fading opacity on a
+   * separate layer was tried and was worse on this Pi (about 12% more).
+   */
+  animation: severe-pulse 2s steps(1, end) infinite;
+}
+
+.icon {
+  margin-right: 6px;
+}
+
+@keyframes severe-pulse {
+  0% {
+    background-color: rgba(200, 0, 0, 0.92);
+  }
+  50% {
+    background-color: rgba(140, 0, 0, 0.92);
+  }
+}

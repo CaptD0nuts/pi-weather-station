@@ -5,6 +5,7 @@ import { AppContext } from "~/AppContext";
 import WeatherMap from "~/components/WeatherMap";
 import InfoPanel from "~/components/InfoPanel";
 import Settings from "~/components/Settings";
+import SevereBanner from "~/components/SevereBanner";
 
 import "!style-loader!css-loader!./overrides.css";
 
@@ -48,6 +49,7 @@ const App = () => {
         <div className={styles.infoContainer}>
           <InfoPanel />
         </div>
+        <SevereBanner />
       </div>
     </div>
   );

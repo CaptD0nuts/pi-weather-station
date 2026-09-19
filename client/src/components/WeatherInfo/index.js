@@ -6,8 +6,11 @@ import LocationName from "~/components/LocationName";
 import CurrentWeather from "~/components/CurrentWeather";
 import DailyChart from "~/components/weatherCharts/DailyChart";
 import HourlyChart from "~/components/weatherCharts/HourlyChart";
+import {
+  NORMAL_CURRENT_WEATHER_REFRESH_MS,
+  SEVERE_CURRENT_WEATHER_REFRESH_MS,
+} from "~/severeWeather";
 
-const CURRENT_WEATHER_DATA_UPDATE_INTERVAL = 10 * 60 * 1000; //every 10 minutes
 const HOURLY_WEATHER_DATA_UPDATE_INTERVAL = 60 * 60 * 1000; //every hour
 const DAILY_WEATHER_DATA_UPDATE_INTERVAL = 24 * 60 * 60 * 1000; //every day
 
@@ -61,13 +64,10 @@ const WeatherInfo = () => {
     darkMode,
     setSettingsMenuOpen,
     currentWeatherData,
-    updateSunriseSunset
+    updateSunriseSunset,
+    severeMode,
   } = useContext(AppContext);
 
-  const [
-    currentWeatherUpdateInterval,
-    setCurrentWeatherUpdateInterval,
-  ] = useState(null);
   const [
     hourlyWeatherUpdateInterval,
     setHourlyWeatherUpdateInterval,
@@ -112,15 +112,23 @@ const WeatherInfo = () => {
     }
   }, [weatherApiKey, reverseGeoApiKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Current conditions: every 10 minutes normally, every 5 in severe weather
+  // mode. Kept in its own effect so switching modes only re-fetches this one.
   useEffect(() => {
-    createWeatherUpdateInterval({
-      stateInterval: currentWeatherUpdateInterval,
-      stateIntervalSetter: setCurrentWeatherUpdateInterval,
-      cb: currentWeatherUpdateCb,
-      intervalTime: CURRENT_WEATHER_DATA_UPDATE_INTERVAL,
-      weatherApiKey,
-      mapGeo,
-    });
+    if (!weatherApiKey || !mapGeo) {
+      return undefined;
+    }
+    const interval = setInterval(
+      currentWeatherUpdateCb,
+      severeMode
+        ? SEVERE_CURRENT_WEATHER_REFRESH_MS
+        : NORMAL_CURRENT_WEATHER_REFRESH_MS
+    );
+    currentWeatherUpdateCb();
+    return () => clearInterval(interval);
+  }, [weatherApiKey, mapGeo, severeMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
     createWeatherUpdateInterval({
       stateInterval: hourlyWeatherUpdateInterval,
       stateIntervalSetter: setHourlyWeatherUpdateInterval,
@@ -138,7 +146,6 @@ const WeatherInfo = () => {
       mapGeo,
     });
     return () => {
-      clearInterval(currentWeatherUpdateInterval);
       clearInterval(hourlyWeatherUpdateInterval);
       clearInterval(dailyWeatherUpdateInterval);
     };

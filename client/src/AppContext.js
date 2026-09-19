@@ -1,7 +1,8 @@
-import React, { createContext, useState } from "react";
+import React, { createContext, useState, useEffect, useRef } from "react";
 import { getSettings } from "~/settings";
 import PropTypes from "prop-types";
 import { getCoordsFromApi } from "~/services/geolocation";
+import { getSevereAlerts, SEVERE_ALERT_POLL_MS } from "~/severeWeather";
 import axios from "axios";
 
 export const AppContext = createContext();
@@ -50,6 +51,36 @@ export function AppContextProvider({ children }) {
   const [mouseHide, setMouseHide] = useState(false);
   const [sunriseTime, setSunriseTime] = useState(null);
   const [sunsetTime, setSunsetTime] = useState(null);
+  const [severeAlerts, setSevereAlerts] = useState([]);
+  const severeMode = severeAlerts.length > 0;
+  const wasSevereMode = useRef(false);
+
+  // Severe weather mode: poll NWS alerts for the home location. On a failed
+  // check the last known state is kept, so a network blip can't switch it off.
+  const homeLat = browserGeo ? browserGeo.latitude : null;
+  const homeLon = browserGeo ? browserGeo.longitude : null;
+  useEffect(() => {
+    if (homeLat === null || homeLon === null) {
+      return undefined;
+    }
+    const check = () => {
+      getSevereAlerts(homeLat, homeLon)
+        .then((alerts) => setSevereAlerts(alerts))
+        .catch((err) => console.log("severe alert check failed", err));
+    };
+    check();
+    const interval = setInterval(check, SEVERE_ALERT_POLL_MS);
+    return () => clearInterval(interval);
+  }, [homeLat, homeLon]);
+
+  // Start the radar animation when severe mode begins, stop it when it ends.
+  // (Only on the transition, so pressing the play/stop button still works.)
+  useEffect(() => {
+    if (severeMode !== wasSevereMode.current) {
+      wasSevereMode.current = severeMode;
+      setAnimateWeatherMap(severeMode);
+    }
+  }, [severeMode]);
 
   /**
    * Save mouse hide state
@@ -609,6 +640,8 @@ export function AppContextProvider({ children }) {
     updateSunriseSunset,
     sunriseTime,
     sunsetTime,
+    severeAlerts,
+    severeMode,
   };
 
   return (
