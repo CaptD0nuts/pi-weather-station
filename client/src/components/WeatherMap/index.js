@@ -152,8 +152,9 @@ const WeatherMap = ({ zoom, dark }) => {
       {mapTimestamp ? (
         <TileLayer
           attribution='<a href="https://www.rainviewer.com/">RainViewer</a>'
-          url={`https://tilecache.rainviewer.com/v2/radar/${mapTimestamp}/{size}/{z}/{x}/{y}/{color}/{smooth}_{snow}.png`}
+          url={`${mapTimestamp}/{size}/{z}/{x}/{y}/{color}/{smooth}_{snow}.png`}
           opacity={0.3}
+          maxNativeZoom={7} // RainViewer serves "Zoom Level Not Supported" tiles above zoom 7
           size={512}
           color={6} // https://www.rainviewer.com/api.html#colorSchemes
           smooth={1}
@@ -206,16 +207,20 @@ function hasVal(i) {
 }
 
 /**
- * Get timestamps for weather map
+ * Get the radar frames for the weather map, oldest first. RainViewer retired
+ * the timestamp-based tile links and `maps.json`; frames now come from
+ * `weather-maps.json` and each has its own `path` that tiles are served from.
  *
- * @returns {Promise} Promise of timestamps
+ * @returns {Promise} Promise of tile base URLs (one per radar frame)
  */
 function getMapTimestamps() {
   return new Promise((resolve, reject) => {
     axios
-      .get("https://api.rainviewer.com/public/maps.json")
+      .get("https://api.rainviewer.com/public/weather-maps.json")
       .then((res) => {
-        resolve(res.data);
+        const { host, radar } = res.data;
+        const frames = (radar && radar.past) || [];
+        resolve(frames.map((frame) => `${host}${frame.path}`));
       })
       .catch((err) => {
         reject(err);
