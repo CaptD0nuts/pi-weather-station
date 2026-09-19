@@ -24,9 +24,9 @@ as the first argument.
 | Command | What it checks |
 |---|---|
 | `node api-calls.js` | How many weather/sunrise/geocode/alert/radar calls the app makes at startup, per map tap and per tap on the location arrow, and what the screen shows. `FAILFIRST=3` makes the first 3 weather calls answer HTTP 429 to test retry back-off; add the `fast` argument (`node api-calls.js ../client/dist label fast`) to fast-forward long timers 600x. |
-| `node alerts.js` | The severe-weather banner appears for a Tornado Warning, ignores a Heat Advisory, and clears; counts React re-renders while the alert check runs quietly. |
+| `node alerts.js` | The severe-weather banner appears for a Tornado Warning and for a strong-thunderstorm Special Weather Statement, ignores a Heat Advisory and fog statements, and clears; counts React re-renders while the alert check runs quietly. |
 | `node clock.js` | Re-renders while idle, how soon after the minute changes the screen updates, date rollover at midnight, and catch-up after a sudden system clock jump (uses a fake system time). |
-| `node severe-match.js` | Offline: which National Weather Service alert names trigger severe mode. |
+| `node severe-match.js` | Offline, uses the real matching code: which National Weather Service alerts trigger severe mode, including that a Special Weather Statement counts only when its text is about a storm hazard (not fog, heat or smoke), and that test/exercise messages never count. |
 | `node sun-check.mjs` | Compares the local sunrise/sunset calculation with sunrise-sunset.org for 7 places and 4 dates. **Uses the network.** That site is known to run about a minute or two off the official definition, so a steady offset is expected. |
 | `node usno-check.mjs` | Compares the local calculation with the US Naval Observatory (the official reference). **Uses the network.** |
 

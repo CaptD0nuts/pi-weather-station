@@ -14,8 +14,10 @@ This is a weather station designed to be used with a Raspberry Pi on the officia
 >   answer, so no weather or radar loaded. Uses `api.tomorrow.io` and RainViewer's current `weather-maps.json` (radar
 >   is real only up to zoom 7, so the layer stretches zoom-7 tiles).
 > - **Severe weather mode.** Polls the free National Weather Service alerts feed; while a Tornado, Severe Thunderstorm,
->   Flash Flood, Hurricane... Watch or Warning is active it shows a red banner, animates the radar by itself and
->   refreshes every 5 minutes instead of 10 (`client/src/severeWeather.js`; add `?severe=test` to the URL to preview).
+>   Flash Flood, Hurricane... Watch or Warning is active, or a Special Weather Statement about a storm hazard (the
+>   notice the NWS issues for a strong storm before it becomes a warning), it shows a red banner, animates the radar by
+>   itself and refreshes every 5 minutes instead of 10 (`client/src/severeWeather.js`; add `?severe=test` to the URL
+>   to preview). Fog, heat and smoke statements are ignored.
 > - **Far fewer API calls and less CPU.** One weather request per refresh instead of three (and one per map tap instead
 >   of six), automatic retry with back-off after a failed load, sunrise/sunset calculated locally (matches the US Naval
 >   Observatory), a clock that redraws once a minute, and a cheaper alert banner. See the commit messages for numbers.

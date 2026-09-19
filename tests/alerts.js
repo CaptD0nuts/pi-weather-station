@@ -52,6 +52,18 @@ const tomorrow = (url) => {
   await page.setViewport({ width: 1024, height: 600 });
   await page.setRequestInterception(true);
 
+  // NWS alert fixtures (text modelled on real alerts, place names replaced)
+  const props = (event, description = "") => ({ properties: { status: "Actual", event, headline: event + " issued by the NWS", description } });
+  const STRONG_STORM = "At 113 PM CDT, Doppler radar was tracking a strong thunderstorm near Exampleville, moving south at 10 mph. HAZARD...Wind gusts up to 45 mph and pea size hail.";
+  const FOG = "Areas of dense fog with visibility below one quarter mile.";
+  const HEAT = "Heat index values near 105 degrees.";
+  const FEATURES = {
+    none: [],
+    tornado: [props("Tornado Warning"), props("Heat Advisory", HEAT)],
+    // a strong-storm Special Weather Statement, plus a fog statement and a heat advisory that must be ignored
+    statement: [props("Special Weather Statement", STRONG_STORM), props("Special Weather Statement", FOG), props("Heat Advisory", HEAT)],
+    fogonly: [props("Special Weather Statement", FOG)],
+  };
   let alertMode = "none";
   let alertPolls = 0;
   page.on("request", (req) => {
@@ -64,7 +76,7 @@ const tomorrow = (url) => {
     if (u.includes("locationiq") || u.includes("reverse")) return json({ address: { city: "Testville", state: "Alabama", country_code: "us", country: "USA" } });
     if (u.includes("api.weather.gov")) {
       alertPolls++;
-      return json({ features: alertMode === "none" ? [] : [{ properties: { status: "Actual", event: "Tornado Warning", headline: "x" } }, { properties: { status: "Actual", event: "Heat Advisory", headline: "ignored" } }] });
+      return json({ features: FEATURES[alertMode] });
     }
     if (u.includes("weather-maps.json")) return json({ host: "https://tilecache.rainviewer.com", radar: { past: [{ time: 1, path: "/v2/radar/x" }] } });
     return req.respond({ status: 200, headers: cors, contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64") });
@@ -95,11 +107,24 @@ const tomorrow = (url) => {
   await wait(1500);
   const textOff = await page.evaluate(() => document.body.innerText);
 
+  // C) a Special Weather Statement about a strong thunderstorm (what the NWS issues before a warning) shows the
+  //    banner; fog and heat statements alone do not
+  alertMode = "statement";
+  await wait(1500);
+  const textStatement = await page.evaluate(() => document.body.innerText);
+  await page.screenshot({ path: path.join(require("os").tmpdir(), "weather-test-shot-statement.png") });
+  alertMode = "fogonly";
+  await wait(1500);
+  const textFogOnly = await page.evaluate(() => document.body.innerText);
+
   console.log(`\n=== ${LABEL} ===`);
   console.log(`quiet 4 s: ${p1 - p0} alert polls, ${c1 - c0} React re-renders (the clock alone accounts for ~4)`);
   console.log("banner shows TORNADO WARNING when alert active :", /TORNADO WARNING/.test(textOn));
   console.log("ignored Heat Advisory not shown                :", !/HEAT ADVISORY/.test(textOn));
   console.log("banner gone after alert clears                 :", !/TORNADO WARNING/.test(textOff));
+  console.log("strong-thunderstorm statement shows a banner   :", /WEATHER STATEMENT: STRONG THUNDERSTORM/.test(textStatement));
+  console.log("fog statement + heat advisory in it not shown  :", !/DENSE FOG|HEAT ADVISORY/.test(textStatement));
+  console.log("a fog-only statement shows no banner           :", !/WEATHER STATEMENT/.test(textFogOnly));
   await browser.close();
   server.close();
 })().catch((e) => { console.error("TEST ERROR", e); process.exit(1); });

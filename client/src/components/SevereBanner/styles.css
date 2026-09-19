@@ -13,6 +13,9 @@
   color: #fff;
   background-color: rgba(200, 0, 0, 0.92);
   pointer-events: none;
+  white-space: nowrap; /* one line; a long list of alerts is cut off with an ellipsis */
+  overflow: hidden;
+  text-overflow: ellipsis;
   /*
    * A blink, not a smooth fade: steps(1) holds each colour for a second and then
    * switches, so the banner repaints once a second. A smooth background-color
