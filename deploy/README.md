@@ -17,7 +17,8 @@ comes back on its own after a power cut. Everything here was tested on that setu
    - `weatherApiKey`: a Tomorrow.io key
    - `mapApiKey`: a Mapbox token
    - `reverseGeoApiKey`: a LocationIQ key (optional, only used for the place name)
-   - `startingLat` / `startingLon`: your location (avoids the location lookup, which no longer works)
+   - `startingLat` / `startingLon`: your location. If left out, the server guesses it from your IP address (via
+     ipapi.co), which is only approximate, so setting it is better
 
    **`settings.json` is git-ignored. Never commit it, and never paste keys into the code.**
 3. Copy the startup script and make it executable:
@@ -47,17 +48,42 @@ Test switches (normally unset): `DRY_RUN=1` (do everything except open the brows
 ## Rebuilding the client
 
 `client/dist` is committed, so nothing needs building on the Pi. To change the client, build on a
-computer with more memory than a Pi, then copy `client/dist` over:
+computer with more memory than a Pi, commit the result, and update the Pi (next section):
 
 ```
 cd client
 npm ci
-NODE_OPTIONS=--openssl-legacy-provider npx webpack -p --env.BUILD_PRODUCTION=1
+npx webpack --mode production      # same as: npm run prod
 ```
 
-(The `--openssl-legacy-provider` flag is needed because this project uses webpack 4 with Node 17+.)
+Since the merge with upstream v3.0.2 the client builds with webpack 5, so no Node compatibility flag is
+needed (the older webpack 4 build needed `NODE_OPTIONS=--openssl-legacy-provider`). The build writes
+`bundle.min.js`, a small `810.bundle.min.js`, `bundle.min.js.LICENSE.txt` and `index.html` to `client/dist`
+and cleans out anything else there. On Windows, build from a short folder path: the installed packages
+nest deeply and can exceed the path length limit.
+
 See `tests/` for headless-browser tests that count API calls, check the clock and the severe-weather
 banner, and verify the sunrise/sunset calculation.
+
+## Updating the display
+
+If the Pi's project folder is a git clone of your repo, an update is a pull plus a browser restart:
+
+```
+cd ~/pi-weather-station
+git pull --ff-only
+pkill -f "[f]irefox-esr --kiosk"        # start-weather reopens the browser a few seconds later, on the new files
+```
+
+If the pull changed anything under `server/` (or `package.json`), close the server first so `start-weather`
+starts the new one when it reopens the browser:
+
+```
+pkill -f "node ./server/index.js"; pkill -f "[f]irefox-esr --kiosk"
+```
+
+`git pull --ff-only` refuses to run if the Pi has local edits that conflict, instead of overwriting them.
+`settings.json` (your keys) is git-ignored, so pulling never touches it.
 
 ## Things worth knowing
 
