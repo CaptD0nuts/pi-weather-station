@@ -3,13 +3,37 @@
 
 This is a weather station designed to be used with a Raspberry Pi on the official 7" 800x480 touchscreen.
 
+> ## About this fork
+>
+> A fork of [elewin/pi-weather-station](https://github.com/elewin/pi-weather-station) (MIT licensed, see `LICENSE`)
+> tuned to run as an always-on display on a Raspberry Pi 4 with a 1024x600 touchscreen, coming back by itself after a
+> power cut. It is based on upstream commit `05ed3f0`; upstream has since made its own fixes (a Tomorrow.io v4 update,
+> a RainViewer fix, webpack 5) that have **not** been merged here. What is different:
+>
+> - **Works again.** The old ClimaCell address (`data.climacell.co`) and RainViewer's retired radar endpoints no longer
+>   answer, so no weather or radar loaded. Uses `api.tomorrow.io` and RainViewer's current `weather-maps.json` (radar
+>   is real only up to zoom 7, so the layer stretches zoom-7 tiles).
+> - **Severe weather mode.** Polls the free National Weather Service alerts feed; while a Tornado, Severe Thunderstorm,
+>   Flash Flood, Hurricane... Watch or Warning is active it shows a red banner, animates the radar by itself and
+>   refreshes every 5 minutes instead of 10 (`client/src/severeWeather.js`; add `?severe=test` to the URL to preview).
+> - **Far fewer API calls and less CPU.** One weather request per refresh instead of three (and one per map tap instead
+>   of six), automatic retry with back-off after a failed load, sunrise/sunset calculated locally (matches the US Naval
+>   Observatory), a clock that redraws once a minute, and a cheaper alert banner. See the commit messages for numbers.
+> - **Always-on setup.** `deploy/` has a startup script that waits for what it needs instead of fixed sleeps (screen up
+>   about 40 s after power-up), keeps the browser running if it crashes, and restarts it nightly; plus cron entries and
+>   setup notes.
+> - **Tests.** `tests/` has headless-browser tests with every outside service faked, so they use none of your API quota.
+>
+> **API keys and other secrets live only in `settings.json`, which is git-ignored. Never commit them.**
+
+
 ![pws-screenshot3](https://user-images.githubusercontent.com/15202038/91359998-4625bb80-e7bb-11ea-937e-c87eede41f35.JPG)
 
-The weather station will require you to have API keys from [Mapbox](https://www.mapbox.com/) and [ClimaCell (v4)](https://www.climacell.co/). Optionally, you can use an API key from [LocationIQ](https://locationiq.com/) to preform reverse geocoding.
+The weather station will require you to have API keys from [Mapbox](https://www.mapbox.com/) and [Tomorrow.io (formerly ClimaCell), API v4](https://www.tomorrow.io/). Optionally, you can use an API key from [LocationIQ](https://locationiq.com/) to preform reverse geocoding.
 
 Weather maps are provided by the [RainViewer](https://www.rainviewer.com/) API, which generously does not require an [API key](https://www.rainviewer.com/api.html).
 
-Sunrise and Sunset times are provided by [Sunrise-Sunset](https://sunrise-sunset.org/), which generously does not require an [API key](https://sunrise-sunset.org/api).
+Sunrise and Sunset times are calculated locally in this fork (upstream used [Sunrise-Sunset](https://sunrise-sunset.org/)).
 
 See it in action [here](https://www.youtube.com/watch?v=dvM6cyqYSw8).
 
