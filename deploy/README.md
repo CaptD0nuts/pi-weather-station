@@ -36,6 +36,9 @@ comes back on its own after a power cut. Everything here was tested on that setu
 - Then keeps the full-screen Firefox running in a loop: if it exits or crashes it is started again
   after a few seconds (checking the server first); if it dies within 20 seconds of starting it waits
   30 seconds so a broken browser cannot spin the CPU.
+- While the browser is open, a background health check looks at the server once a minute. If it has not
+  answered 3 times in a row it is restarted (logged as `health check: ...`); the open page keeps running and
+  reloads its data by itself. The check stops when `start-weather` stops.
 - Firefox is started as a native Wayland app (`MOZ_ENABLE_WAYLAND=1`); running it through the X11
   compatibility layer left a 16 pixel strip of wallpaper at the bottom of the screen.
 - The script assumes the desktop user is uid 1000 (`/run/user/1000`), the default first user.
@@ -43,7 +46,8 @@ comes back on its own after a power cut. Everything here was tested on that setu
 
 Test switches (normally unset): `DRY_RUN=1` (do everything except open the browser),
 `KIOSK_CMD="sleep 5"` (run this instead of the browser, to test the loop),
-`NET_PROBE_URL` and `WAIT_NET_SECONDS` (override the network check).
+`NET_PROBE_URL` and `WAIT_NET_SECONDS` (override the network check),
+`HEALTH_INTERVAL` and `HEALTH_FAILS` (seconds between server checks, misses before a restart).
 
 ## Rebuilding the client
 

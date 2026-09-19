@@ -13,11 +13,14 @@
 # started again (after checking the server is still up); the nightly 04:00 cron job
 # just closes the browser and this loop opens a fresh one. Before this, a browser
 # crash left the desktop showing until someone rebooted.
+# 2026-09-19: a background health check restarts the server if it stops answering
+# while the browser is open (3 misses in a row, checked once a minute).
 # Progress is logged with time-since-boot to ~/start-weather.log (via cron).
 #
 # Test switches (normally unset):  DRY_RUN=1  -> don't launch the browser
 #                                  KIOSK_CMD=... -> run this instead of the browser
 #                                  NET_PROBE_URL / WAIT_NET_SECONDS -> override network check
+#                                  HEALTH_INTERVAL / HEALTH_FAILS -> seconds between server checks / misses before restart
 
 log() { echo "[$(date '+%H:%M:%S') up $(cut -d. -f1 /proc/uptime)s] $*"; }
 
@@ -65,6 +68,35 @@ fi
 export DISPLAY=:0 XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-1 MOZ_ENABLE_WAYLAND=1
 KIOSK_CMD="${KIOSK_CMD:-/usr/bin/firefox-esr --kiosk localhost:8080}"
 
+# Health check, in the background: while the browser is open nothing else would notice the server dying
+# (the check above only runs when the browser exits). Once a minute, if the server has not answered 3 times
+# in a row, restart it. The open browser page keeps running and reloads its data on its own.
+health_loop() {
+  local fails=0
+  while true; do
+    sleep "${HEALTH_INTERVAL:-60}"
+    if server_up; then
+      fails=0
+      continue
+    fi
+    fails=$((fails + 1))
+    log "health check: server not answering ($fails/${HEALTH_FAILS:-3})"
+    if [ "$fails" -ge "${HEALTH_FAILS:-3}" ]; then
+      log "health check: restarting the server"
+      pkill -f "[n]ode ./server/index.js"
+      sleep 2
+      start_server
+      wait_for 60 server_up && log "health check: server is back" || log "WARNING: server still not answering after restart"
+      fails=0
+    fi
+  done
+}
+health_loop &
+HEALTH_PID=$!
+# stop the health check together with this script, however it is stopped
+trap 'kill "$HEALTH_PID" 2> /dev/null' EXIT
+trap 'exit 143' TERM INT HUP
+
 while true; do
   if ! server_up; then
     log "server not answering - starting it again"
@@ -73,7 +105,10 @@ while true; do
   fi
   log "launching kiosk browser"
   started=$SECONDS
-  $KIOSK_CMD
+  # run it in the background and wait, so a stop signal reaches the trap above at once (bash holds a trap
+  # back while a foreground program runs)
+  $KIOSK_CMD &
+  wait $!
   code=$?
   ran=$((SECONDS - started))
   log "kiosk browser exited (code $code) after ${ran}s"
