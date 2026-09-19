@@ -145,6 +145,11 @@ function tomorrowResponse(url) {
   const resetLog = log.slice();
 
   const panelText = await page.evaluate(() => document.body.innerText);
+  // the map's credit line: a plain "Leaflet" link, without the flag icon Leaflet 1.9 adds by default
+  const credit = await page.evaluate(() => {
+    const el = document.querySelector(".leaflet-control-attribution");
+    return el ? { hasLeaflet: /Leaflet/.test(el.innerText), hasIcon: !!el.querySelector("svg") } : null;
+  });
   const { getSunTimes } = await require("./load-modules.js").loadSunTimes();
   const st = getSunTimes(new Date(), 36.1627, -86.7816);
   const fmtT = (d) => new Date(Math.round(d.getTime() / 60000) * 60000).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
@@ -154,6 +159,7 @@ function tomorrowResponse(url) {
     sunTimesOnScreen: norm(startupText).includes(norm(fmtT(st.sunrise))) && norm(startupText).includes(norm(fmtT(st.sunset))),
     expectedSun: expectSun,
     weatherShown: /Testville/.test(panelText),
+    leafletCreditPlain: !!credit && credit.hasLeaflet && !credit.hasIcon,
     sunriseSunset: /AM|PM/.test(panelText),
     noErrorText: !/Could not retrieve|Cannot get/.test(panelText),
   };

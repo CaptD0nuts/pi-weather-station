@@ -144,7 +144,14 @@ const WeatherMap = ({ zoom, dark }) => {
       fadeAnimation={false}
       onClick={mapClickHandler}
     >
-      <AttributionControl position={"bottomleft"} />
+      <AttributionControl
+        position={"bottomleft"}
+        // Leaflet 1.9 puts a small flag icon in front of its name in this credit. Use the plain
+        // text link, as Leaflet 1.6 did; the credit and link to Leaflet are kept.
+        prefix={
+          '<a href="https://leafletjs.com" title="A JavaScript library for interactive maps">Leaflet</a>'
+        }
+      />
       <TileLayer
         attribution='© <a href="https://www.mapbox.com/feedback/">Mapbox</a>'
         url={`https://api.mapbox.com/styles/v1/mapbox/${
