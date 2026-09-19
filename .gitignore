@@ -1,2 +1,8 @@
 node_modules/
 settings.json
+
+# never commit API keys, passwords or local backups of them
+.env
+*.bak
+*.bak.*
+settings.json.bak*

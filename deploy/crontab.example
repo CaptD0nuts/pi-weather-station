@@ -1,0 +1,11 @@
+# Cron entries for the weather display (install with: crontab -e)
+#
+# Start the display at boot. deploy/start-weather (copy it to ~/Desktop/start-weather)
+# waits for the server, the desktop and network + a correct clock, then keeps the
+# full-screen browser running; its progress is logged to ~/start-weather.log.
+@reboot export DISPLAY=:0 XAUTHORITY=$HOME/.Xauthority && $HOME/Desktop/start-weather >> $HOME/start-weather.log 2>&1
+
+# Every night at 04:00: close the browser. The loop in start-weather notices and opens
+# a fresh one a few seconds later (protects against slow memory growth in a browser
+# that runs for weeks). The [f] stops pkill from matching this line's own text.
+0 4 * * * echo "[$(date +\%H:\%M:\%S)] nightly kiosk restart" >> $HOME/start-weather.log; /usr/bin/pkill -f "[f]irefox-esr --kiosk"

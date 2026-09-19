@@ -39,7 +39,8 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(path.join(`${__dirname}/${DIST_DIR}`)));
 app.listen(PORT, "localhost", async () => {
-  await open(`http://localhost:${PORT}`);
+  // (removed: deploy/start-weather launches the kiosk browser itself; open() started
+  // a second browser that the old script then had to kill)
   console.log(`${appName} v${ver} has started on port ${PORT}`);
 });
 

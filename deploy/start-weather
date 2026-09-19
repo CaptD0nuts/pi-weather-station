@@ -1,0 +1,86 @@
+#!/bin/bash
+
+# Starts the weather station display: the web server, then the full-screen browser,
+# and keeps the browser running.
+# captd0nuts 21NOV2023
+#
+# 2026-09-18 (1): instead of fixed sleeps this waits for what it actually needs --
+# the server, the desktop, and network + a correct clock -- so the display appears
+# about as soon as it can. Every wait has a time limit, and if one runs out the
+# browser is launched anyway (the app retries on its own schedule), so a slow router
+# after a power cut can never leave the screen blank.
+# 2026-09-18 (2): the browser now runs in a loop. If it exits or crashes it is
+# started again (after checking the server is still up); the nightly 04:00 cron job
+# just closes the browser and this loop opens a fresh one. Before this, a browser
+# crash left the desktop showing until someone rebooted.
+# Progress is logged with time-since-boot to ~/start-weather.log (via cron).
+#
+# Test switches (normally unset):  DRY_RUN=1  -> don't launch the browser
+#                                  KIOSK_CMD=... -> run this instead of the browser
+#                                  NET_PROBE_URL / WAIT_NET_SECONDS -> override network check
+
+log() { echo "[$(date '+%H:%M:%S') up $(cut -d. -f1 /proc/uptime)s] $*"; }
+
+# wait_for <max seconds> <command...>  -- retry once a second until it succeeds or time runs out
+wait_for() {
+  local end=$((SECONDS + $1))
+  shift
+  until "$@"; do
+    [ "$SECONDS" -ge "$end" ] && return 1
+    sleep 1
+  done
+}
+
+server_up()  { curl -s -o /dev/null -m 2 http://localhost:8080/; }
+desktop_up() { [ -S /run/user/1000/wayland-1 ] && pgrep -x wf-panel-pi > /dev/null; }
+# clock synced (HTTPS fails with a wrong clock) AND a real HTTPS answer from the internet
+net_up() {
+  [ "$(timedatectl show -p NTPSynchronized --value 2> /dev/null)" = yes ] &&
+    curl -s -o /dev/null -m 5 "${NET_PROBE_URL:-https://api.rainviewer.com/public/weather-maps.json}"
+}
+start_server() {
+  log "starting server"
+  (cd "$HOME/pi-weather-station/" && /usr/bin/npm start &)
+}
+
+cd "$HOME/pi-weather-station/" || { log "ERROR: pi-weather-station folder missing"; exit 1; }
+
+if server_up; then
+  log "server already running"
+else
+  start_server
+fi
+
+wait_for 60 server_up && log "server ready" || log "WARNING: server not answering after 60 s"
+wait_for 120 desktop_up && log "desktop ready" || log "WARNING: desktop not ready after 120 s, launching anyway"
+wait_for "${WAIT_NET_SECONDS:-300}" net_up && log "network + clock ready" || log "WARNING: network/clock not ready, launching anyway"
+sleep 2 # let the desktop settle
+
+if [ -n "$DRY_RUN" ]; then
+  log "DRY RUN: would launch the kiosk browser now"
+  exit 0
+fi
+
+# Native Wayland (not Xwayland): the X11 path left a 16 px wallpaper strip at the bottom
+export DISPLAY=:0 XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-1 MOZ_ENABLE_WAYLAND=1
+KIOSK_CMD="${KIOSK_CMD:-/usr/bin/firefox-esr --kiosk localhost:8080}"
+
+while true; do
+  if ! server_up; then
+    log "server not answering - starting it again"
+    start_server
+    wait_for 60 server_up || log "WARNING: server still not answering, launching browser anyway"
+  fi
+  log "launching kiosk browser"
+  started=$SECONDS
+  $KIOSK_CMD
+  code=$?
+  ran=$((SECONDS - started))
+  log "kiosk browser exited (code $code) after ${ran}s"
+  if [ "$ran" -lt 20 ]; then
+    log "exited quickly - waiting 30 s before trying again"
+    sleep 30
+  else
+    sleep 5
+  fi
+done
