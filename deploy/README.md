@@ -62,6 +62,12 @@ needed (the older webpack 4 build needed `NODE_OPTIONS=--openssl-legacy-provider
 and cleans out anything else there. On Windows, build from a short folder path: the installed packages
 nest deeply and can exceed the path length limit.
 
+The `@iconify/*` packages in `client/package.json` are pinned to exact versions (no `^`) on purpose. Newer
+releases of the icon sets redraw every icon on a padded 30x30 canvas, which makes the degree sign and the
+weather stat icons visibly smaller and detached from the temperature. Upstream's own webpack 5 build looks
+like that because its lock file picked up the new releases. If you ever update these packages, check the
+temperature and icons area of the screen afterwards.
+
 See `tests/` for headless-browser tests that count API calls, check the clock and the severe-weather
 banner, and verify the sunrise/sunset calculation.
 
